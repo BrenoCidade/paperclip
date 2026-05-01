@@ -1,10 +1,7 @@
 #!/bin/sh
 set -e
-# Capture runtime UID/GID from environment variables, defaulting to 1000
 PUID=${USER_UID:-1000}
 PGID=${USER_GID:-1000}
-# Adjust the node user's UID/GID if they differ from the runtime request
-# and fix volume ownership only when a remap is needed
 changed=0
 if [ "$(id -u node)" -ne "$PUID" ]; then
     echo "Updating node UID to $PUID"
@@ -20,8 +17,17 @@ fi
 if [ "$changed" = "1" ]; then
     chown -R node:node /paperclip
 fi
-# Bootstrap CEO admin if no admin exists yet
-gosu node pnpm paperclipai auth bootstrap-ceo 2>/dev/null || true
 
-exec gosu node "$@"
-# force rebuild
+# Start server in background, wait for it to be ready, then bootstrap
+gosu node "$@" &
+SERVER_PID=$!
+
+echo "Waiting for server to be ready..."
+until gosu node node -e "require('http').get('http://localhost:3100/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))" 2>/dev/null; do
+    sleep 2
+done
+
+echo "Server ready. Running bootstrap..."
+gosu node pnpm paperclipai auth bootstrap-ceo 2>&1 || true
+
+wait $SERVER_PID
