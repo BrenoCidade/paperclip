@@ -24,3 +24,4 @@ fi
 gosu node pnpm paperclipai auth bootstrap-ceo 2>/dev/null || true
 
 exec gosu node "$@"
+# force rebuild
