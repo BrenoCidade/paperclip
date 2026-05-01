@@ -17,4 +17,6 @@ fi
 if [ "$changed" = "1" ]; then
     chown -R node:node /paperclip
 fi
+# Onboard primeiro (não-interativo), depois sobe o servidor
+gosu node pnpm paperclipai onboard --yes --bind lan 2>&1 || true
 exec gosu node "$@"
